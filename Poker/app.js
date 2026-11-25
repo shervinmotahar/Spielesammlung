@@ -104,68 +104,153 @@
   function paintTable(ctx, W, H, g, look, reveal) {
     ctx.clearRect(0, 0, W, H);
     const felt = FELTS[look.felt][1], back = BACKS[look.back][1];
-    const ox = W * 0.04, oy = H * 0.07, ow = W * 0.92, oh = H * 0.86, rad = Math.min(ow, oh) / 2;
+    const portrait = H > W * 1.1;
+    // Hochformat: abgerundetes Rechteck (Platz in den Ecken für die Schilder), quer: ovaler Tisch
+    const ox = W * (portrait ? 0.015 : 0.04), oy = H * (portrait ? 0.015 : 0.07), ow = W - 2 * ox, oh = H - 2 * oy;
+    const rad = portrait ? Math.min(ow, oh) * 0.16 : Math.min(ow, oh) / 2;
     rr(ctx, ox, oy, ow, oh, rad); ctx.fillStyle = '#2A1E14'; ctx.fill();
     const ins = Math.max(6, Math.min(W, H) * 0.014);
-    rr(ctx, ox + ins, oy + ins, ow - 2 * ins, oh - 2 * ins, rad - ins);
+    const ix = ox + ins, iy = oy + ins, iw = ow - 2 * ins, ih = oh - 2 * ins;
+    rr(ctx, ix, iy, iw, ih, rad - ins);
     const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
     grad.addColorStop(0, shade(felt, 0.1)); grad.addColorStop(1, shade(felt, -0.25));
     ctx.fillStyle = grad; ctx.fill(); ctx.strokeStyle = shade(felt, -0.5); ctx.lineWidth = 1; ctx.stroke();
-    const portrait = H > W * 1.1;
-    const ch = Math.min(H * (portrait ? 0.11 : 0.17), W * (portrait ? 0.15 : 0.1)), cw = ch * 0.7;
-    const cx = W / 2, cy = H / 2;
-    const bx = cx - (5 * cw + 4 * cw * 0.12) / 2, by = cy - ch / 2;
+
+    // Maße: Schild (Name, Chips, Aktion, kleine verdeckte Karten), Kartengröße
+    const n = g.players.length, gap = 6;
+    const podW = portrait ? Math.min(122, (iw - 4 * gap) / 3) : Math.min(150, Math.max(104, W * 0.17)), podH = portrait ? 54 : 60;
+    const ch = portrait ? Math.min(H * 0.12, W * 0.16) : Math.min(H * 0.16, W * 0.09), cw = ch * 0.7;
+    const hkh = ch * 1.1, hkw = cw * 1.1;                                    // deine Karten
+    const cx = W / 2;
+    // Sitzplätze (Mittelpunkt des Schilds); Platz 0 = du unten in der Mitte, dann im Uhrzeigersinn
+    let seats, boardY;
+    if (portrait) {
+      const L = ix + gap + podW / 2, R = ix + iw - gap - podW / 2, C = cx;
+      const T = iy + 8 + podH / 2, B = iy + ih - 8 - podH / 2;
+      seats = n === 2 ? [[C, B], [C, T]] : n === 4 ? [[C, B], [L, T], [C, T], [R, T]]
+                                       : [[C, B], [L, B], [L, T], [C, T], [R, T], [R, B]];
+      const topZone = T + podH / 2 + 4 + ch * 0.8;                        // unter den oberen Schildern: Einsätze bzw. aufgedeckte Karten
+      const bottomZone = B - podH / 2 - 8 - hkh;                          // über deinem Schild: deine Karten
+      boardY = (topZone + bottomZone) / 2 + 8;
+    } else {
+      const rx = iw / 2 - podW / 2 - gap, ry = ih / 2 - podH / 2 - gap;
+      seats = g.players.map((p, i) => { const a = Math.PI / 2 + 2 * Math.PI * i / n; return [cx + Math.cos(a) * rx, H / 2 + Math.sin(a) * ry]; });
+      boardY = H / 2;
+    }
+    // niedriger Tisch (Handy quer): deine Karten passen nicht über dein Schild → offen im Schild selbst
+    const inline = !portrait && seats[0][1] - podH / 2 - (boardY + ch / 2) < hkh + 16;
+    const ikh = podH - 10, ikw = ikh * 0.7;
+
+    // Gemeinschaftskarten und Pot
+    const bx = cx - (5 * cw + 4 * cw * 0.12) / 2, by = boardY - ch / 2;
     for (let i = 0; i < 5; i++) {
       const x = bx + i * cw * 1.12;
       if (i < g.board.length) drawCard(ctx, g.board[i], x, by, cw, ch, back, false);
       else { rr(ctx, x, by, cw, ch, cw * 0.075); ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 1.5; ctx.stroke(); }
     }
     ctx.fillStyle = 'rgba(255,255,255,.86)'; ctx.font = '600 ' + (portrait ? 13 : 14) + 'px ' + UI_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Pot ' + N(g.pot()), cx, by - 14);
-    const n = g.players.length, rx = ow / 2 - cw * 0.5, ry = oh / 2 - ch * 0.35;
+    ctx.fillText('Pot ' + N(g.pot()), cx, by - 13);
+
+    const fit = (s, maxW) => { if (ctx.measureText(s).width <= maxW) return s; while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1); return s + '…'; };
+    const podWidth = pl => pl.human && inline && !pl.out && pl.cards.length === 2 ? podW + ikw * 1.75 + 6 : podW;
+    // belegte Flächen [x, y, b, h]: Tischkarten mit Pot, alle Schilder, deine großen Karten – aufgedeckte Karten weichen ihnen aus
+    const taken = [[bx - 4, by - 24, 5 * cw * 1.12 + 8, ch + 28]];
     g.players.forEach((pl, i) => {
-      const a = Math.PI / 2 + 2 * Math.PI * i / n;
-      const human = pl.human, sc = human ? 1.1 : 0.8, kw = cw * sc, kh = ch * sc;
-      const bw = Math.max(portrait ? 92 : 112, kw * 2.2), bh = portrait ? 36 : 42;
-      // im Hochformat liegen seitliche Plätze sonst auf den Gemeinschaftskarten → nach oben schieben
-      const sx0 = cx + Math.cos(a) * rx, sy = cy + Math.sin(a) * ry - (portrait && Math.abs(Math.cos(a)) > 0.9 ? ch * 2.1 : 0);
-      const sx = Math.max(bw / 2 + 4, Math.min(W - bw / 2 - 4 - (portrait ? 40 : 48), sx0));      // Schild bleibt im Bild
-      let kx = sx + (cx - sx) * 0.18 - kw * 0.9, ky = sy + (cy - sy) * 0.22 - kh * 0.95;
-      if (human) ky = sy - kh - 26;
-      if (!pl.out && pl.cards.length === 2 && (human || !pl.folded)) {
-        const show = human || (reveal && !pl.cards[0].down);
+      const w = podWidth(pl); taken.push([seats[i][0] - w / 2 - 2, seats[i][1] - podH / 2 - 2, w + 4, podH + 4]);
+      if (pl.human && !inline) taken.push([seats[i][0] - hkw * 0.9 - 2, seats[i][1] - podH / 2 - 8 - hkh, hkw * 1.8 + 4, hkh + 4]);
+    });
+    const free = r => r[0] >= 2 && r[1] >= 2 && r[0] + r[2] <= W - 2 && r[1] + r[3] <= H - 2 &&
+      taken.every(t => r[0] >= t[0] + t[2] || t[0] >= r[0] + r[2] || r[1] >= t[1] + t[3] || t[1] >= r[1] + r[3]);
+    g.players.forEach((pl, i) => {
+      const [sx, sy] = seats[i];
+      const human = pl.human, cardsIn = human && inline && !pl.out && pl.cards.length === 2;
+      const pw = podWidth(pl);
+      const left = sx - pw / 2, top = sy - podH / 2;
+      // Richtung zur Tischmitte: dort liegen Einsatz bzw. aufgedeckte Karten
+      let ux = cx - sx, uy = boardY - sy;
+      if (portrait) { ux = 0; uy = sy < boardY ? 1 : -1; }
+      const len = Math.hypot(ux, uy) || 1; ux /= len; uy /= len;
+      const reach = Math.min(Math.abs(ux) > 0.01 ? pw / 2 / Math.abs(ux) : 1e9, Math.abs(uy) > 0.01 ? podH / 2 / Math.abs(uy) : 1e9);
+      const spot = (extra) => [sx + ux * (reach + extra), sy + uy * (reach + extra)];
+
+      // deine Karten groß über deinem Schild
+      if (human && !inline && !pl.out && pl.cards.length === 2) {
+        const kx = sx - (hkw * 1.8) / 2, ky = top - 6 - hkh;
         pl.cards.forEach((c, k) => {
-          drawCard(ctx, c, kx + k * kw * 0.8, ky + (k === 0 ? kh * 0.04 : 0), kw, kh, back, !show);
-          if (pl.folded) { rr(ctx, kx + k * kw * 0.8, ky + (k === 0 ? kh * 0.04 : 0), kw, kh, kw * 0.075); ctx.fillStyle = 'rgba(20,20,20,.6)'; ctx.fill(); }
+          drawCard(ctx, c, kx + k * hkw * 0.8, ky + (k === 0 ? hkh * 0.04 : 0), hkw, hkh, back, false);
+          if (pl.folded) { rr(ctx, kx + k * hkw * 0.8, ky + (k === 0 ? hkh * 0.04 : 0), hkw, hkh, hkw * 0.075); ctx.fillStyle = 'rgba(20,20,20,.6)'; ctx.fill(); }
         });
       }
+      // aufgedeckte Karten der Gegner am Ende der Hand (dort, wo sonst der Einsatz liegt)
+      const shown = !human && reveal && !pl.out && !pl.folded && pl.cards.length === 2 && !pl.cards[0].down;
+      if (shown) {
+        const kw = cw * 0.8, kh = ch * 0.8, bw = kw * 1.95;
+        // Kandidaten: Richtung Tischmitte, seitlich zur Mitte, über/unter dem Schild – der erste freie gewinnt
+        const sgx = ux > 0.05 ? 1 : ux < -0.05 ? -1 : 0, sgy = sy < boardY ? 1 : -1;
+        const cands = [spot(4 + (Math.abs(uy) > 0.7 ? kh / 2 : kw))];
+        if (sgx) cands.push([sx + sgx * (pw / 2 + 5 + bw / 2), sy]);
+        cands.push([sx, sy + sgy * (podH / 2 + 5 + kh / 2)], [sx, sy - sgy * (podH / 2 + 5 + kh / 2)]);
+        if (sgx) cands.push([sx - sgx * (pw / 2 + 5 + bw / 2), sy]);
+        let pos = cands[0];
+        for (const c of cands) { const r = [c[0] - bw / 2, c[1] - kh / 2, bw, kh]; if (free(r)) { pos = c; break; } }
+        const [px, py] = pos;
+        taken.push([px - bw / 2 - 2, py - kh / 2 - 2, bw + 4, kh + 4]);
+        pl.cards.forEach((c, k) => drawCard(ctx, c, px - bw / 2 + k * kw * 0.95, py - kh / 2, kw, kh, back, false));
+      }
+
+      // Schild
       const active = g.toAct === i && PokerGame.STREETS.indexOf(g.street) <= 3;
-      const bxp = sx - bw / 2, byp = human ? sy - 26 : ky + kh - 6;
-      rr(ctx, bxp, byp, bw, bh, 6); ctx.fillStyle = pl.out ? 'rgba(18,18,18,.47)' : 'rgba(18,18,18,.84)'; ctx.fill();
       const won = pl.won > 0 && g.street === 'over';
-      ctx.strokeStyle = active || won ? '#E6E6E6' : 'rgba(255,255,255,.35)'; ctx.lineWidth = active || won ? 2 : 1; ctx.stroke();
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = pl.out || pl.folded ? '#6B6B6B' : '#EDEDED'; ctx.font = '600 ' + (portrait ? 12 : 13) + 'px ' + UI_FONT;
-      ctx.fillText(pl.name + (pl.out ? '' : '  ' + N(pl.chips)), sx, byp + bh * 0.3);
-      let line2 = pl.out ? 'ausgeschieden (Platz ' + pl.place + ')' : won ? 'gewinnt ' + N(pl.won) : pl.folded ? 'ausgestiegen' : pl.allIn ? 'all-in' : pl.last;
-      if (g.street === 'over' && pl.hv >= 0 && look.handNames && (reveal || human) && !pl.folded) line2 = PokerGame.handName(pl.hv) + (won ? ' · +' + N(pl.won) : '');
-      ctx.fillStyle = won ? '#E6E6E6' : '#9E9E9E'; ctx.font = (portrait ? 11 : 12) + 'px ' + UI_FONT;
-      ctx.fillText(line2, sx, byp + bh * 0.72);
-      const td = portrait ? 17 : 20;
-      let tx = bxp + bw + 4;
-      const tag = (s, bg, fg) => {
-        ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(tx + td / 2, byp + bh / 2, td / 2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = fg; ctx.font = '600 ' + (td * (s.length > 1 ? 0.42 : 0.55)) + 'px ' + UI_FONT; ctx.fillText(s, tx + td / 2, byp + bh / 2 + 1);
-        tx += td + 3;
-      };
-      if (i === g.dealer) tag('D', '#FFFFFF', '#161616');
-      if (g.street !== 'over' && i === g.sbPos) tag('SB', '#3D3D3D', '#FFFFFF'); else if (g.street !== 'over' && i === g.bbPos) tag('BB', '#3D3D3D', '#FFFFFF');
+      ctx.save();
+      if (pl.out || pl.folded) ctx.globalAlpha = 0.6;
+      rr(ctx, left, top, pw, podH, 8); ctx.fillStyle = 'rgba(18,18,18,.88)'; ctx.fill();
+      ctx.strokeStyle = active || won ? '#E6E6E6' : 'rgba(255,255,255,.3)'; ctx.lineWidth = active || won ? 2 : 1; ctx.stroke();
+      let tx = left + 9;
+      if (cardsIn) {
+        pl.cards.forEach((c, k) => drawCard(ctx, c, left + 5 + k * ikw * 0.75, top + 5, ikw, ikh, back, false));
+        tx = left + 5 + ikw * 1.75 + 6;
+      }
+      if (!human && !pl.out && pl.cards.length === 2 && !pl.folded && !shown) {
+        const mh = Math.min(podH - 22, 30), mw = mh * 0.68, my = top + (podH - mh) / 2;
+        drawCard(ctx, null, left + 5, my, mw, mh, back, true);
+        drawCard(ctx, null, left + 5 + mw * 0.35, my, mw, mh, back, true);
+        tx = left + 5 + mw * 1.35 + 6;
+      }
+      const tagR = portrait ? 8 : 9, tags = [];
+      if (i === g.dealer) tags.push(['D', '#FFFFFF', '#161616']);
+      if (g.street !== 'over' && i === g.sbPos) tags.push(['SB', '#4B4B4B', '#FFFFFF']);
+      else if (g.street !== 'over' && i === g.bbPos) tags.push(['BB', '#4B4B4B', '#FFFFFF']);
+      const textW = left + pw - 7 - tx;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#EDEDED'; ctx.font = '600 ' + (portrait ? 12.5 : 13.5) + 'px ' + UI_FONT;
+      ctx.fillText(fit(pl.name, textW), tx, top + podH * 0.24);
+      ctx.fillStyle = '#CFCFCF'; ctx.font = (portrait ? 12 : 13) + 'px ' + UI_FONT;
+      ctx.fillText(fit(pl.out ? '–' : N(pl.chips), textW - tags.length * (tagR * 2 + 3)), tx, top + podH * 0.51);
+      let status = pl.out ? 'Platz ' + pl.place : won ? 'gewinnt ' + N(pl.won) : pl.folded ? 'ausgestiegen' : pl.allIn ? 'all-in' : pl.last;
+      if (g.street === 'over' && pl.hv >= 0 && look.handNames && (reveal || human) && !pl.folded) status = PokerGame.handName(pl.hv);
+      ctx.fillStyle = won ? '#E6E6E6' : '#9E9E9E'; ctx.font = (portrait ? 10.5 : 11.5) + 'px ' + UI_FONT;
+      // passt „Mitgehen 20“ nicht, Betrag weglassen (er liegt ohnehin als Chips auf dem Tisch)
+      if (status && ctx.measureText(status).width > textW) status = status.replace(/\s[\d.]+$/, '');
+      ctx.fillText(fit(status || '', textW), tx, top + podH * 0.78);
+      // D / SB / BB rechts in der Chips-Zeile
+      let gx = left + pw - 6 - tagR;
+      for (const [s, bg, fg] of tags) {
+        ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(gx, top + podH * 0.51, tagR, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.font = '600 ' + (tagR * (s.length > 1 ? 0.95 : 1.2)) + 'px ' + UI_FONT;
+        ctx.fillText(s, gx, top + podH * 0.51 + 0.5);
+        gx -= tagR * 2 + 3;
+      }
+      ctx.restore();
+
+      // Einsatz dieser Runde: Chips und Betrag zwischen Schild und Tischmitte (bei dir neben deinen Karten)
       if (pl.bet > 0) {
-        let ex = sx + (cx - sx) * 0.5, ey = sy + (cy - sy) * 0.52;
-        if (human) ey = by + ch + 30;
-        const d = Math.max(16, ch * 0.28);
-        drawStack(ctx, ex - d * 0.6, ey + d / 2, d, pl.bet);
-        ctx.fillStyle = '#fff'; ctx.font = '600 12px ' + UI_FONT; ctx.textAlign = 'left'; ctx.fillText(N(pl.bet), ex + d * 0.1, ey);
+        const d = Math.max(16, ch * 0.3);
+        let ex, ey;
+        if (human && !inline) { ex = sx; ey = top - 6 - hkh - 8 - d * 0.5; }     // über deinen Karten
+        else [ex, ey] = spot(6 + d * 0.6);
+        drawStack(ctx, ex - d * 0.55, ey + d / 2, d, pl.bet);
+        ctx.fillStyle = '#fff'; ctx.font = '600 12px ' + UI_FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(N(pl.bet), ex + d * 0.05, ey);
       }
     });
   }

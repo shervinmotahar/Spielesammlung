@@ -1,6 +1,6 @@
 // Poker – Offline-Betrieb: App-Dateien werden zwischengespeichert. Bei jedem Start wird im Hintergrund
 // nach neuen Versionen gesucht (beim nächsten Öffnen aktiv). Nach Änderungen VERSION erhöhen.
-const VERSION = 'poker-1';
+const VERSION = 'poker-2';
 const FILES = ['./', 'index.html', 'app.js', 'poker.js', 'manifest.webmanifest',
                'icon-192.png', 'icon-512.png', 'icon-maskable.png'];
 
