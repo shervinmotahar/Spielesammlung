@@ -1,6 +1,6 @@
 // Black Jack – Offline-Betrieb. Mit Netz werden die Dateien immer frisch geholt (neue Versionen sind sofort da),
 // ohne Netz (oder nach 3 s ohne Antwort) kommen sie aus dem Zwischenspeicher. Nach Änderungen VERSION erhöhen.
-const VERSION = 'blackjack-2';
+const VERSION = 'blackjack-3';
 const FILES = ['./', 'index.html', 'app.js', 'blackjack.js', 'manifest.webmanifest',
                'icon-192.png', 'icon-512.png', 'icon-maskable.png'];
 
@@ -11,7 +11,8 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+    // nur eigene alte Speicher loeschen - alle Spiele liegen auf derselben Adresse und teilen sich den Speicher
+    .then(keys => Promise.all(keys.filter(k => k !== VERSION && k.split('-')[0] === VERSION.split('-')[0]).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
