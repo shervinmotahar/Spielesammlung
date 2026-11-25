@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E0E">
+<meta name="description" content="Spielesammlung: Schach, Black Jack, Dame, Go, Poker und Backgammon">
+<title>Spielesammlung</title>
+<link rel="icon" href="Backgammon/icon-192.png">
+<style>
+  /* Design wie die Spiele: dunkel, nur Grautöne */
+  :root {
+    --bg: #161616; --header: #0E0E0E; --card: #1F1F1F; --border: #333333; --line: #2A2A2A; --hover: #292929;
+    --text: #EDEDED; --muted: #9E9E9E; --faint: #6B6B6B; --focus: #8A8A8A;
+    --font: "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
+  header { display: flex; align-items: center; gap: 14px; background: var(--header); border-bottom: 1px solid var(--line);
+           padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top)); }
+  header h1 { margin: 0; font-weight: 300; font-size: 26px; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  a.game { display: flex; align-items: center; gap: 16px; padding: 16px; background: var(--card); border: 1px solid var(--border);
+           color: inherit; text-decoration: none; min-height: 96px; }
+  a.game:hover { background: var(--hover); border-color: var(--focus); }
+  a.game img { width: 56px; height: 56px; flex: none; }
+  a.game b { display: block; font-size: 17px; font-weight: 600; margin-bottom: 3px; }
+  a.game span { color: var(--muted); font-size: 13.5px; line-height: 1.4; }
+  .note { color: var(--faint); font-size: 13px; line-height: 1.55; margin-top: 22px; }
+  @media (min-width: 700px) { header { padding: 18px 24px; } header h1 { font-size: 30px; } main { padding: 28px 24px 40px; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Spielesammlung</h1>
+    <p>Gegen den Computer oder zu zweit – auf dem Handy wie eine App</p>
+  </div>
+</header>
+<main>
+  <div class="grid">
+    <a class="game" href="https://shervinmotahar.github.io/Schach/"><img src="schach-icon.png" alt=""><div><b>Schach</b><span>Gegen den Computer (3 Stärken) oder zu zweit, mit Tipp und Statistik.</span></div></a>
+    <a class="game" href="Dame/"><img src="Dame/icon-192.png" alt=""><div><b>Dame</b><span>Deutsch, Russisch, Brasilianisch oder Checkers – gegen den Computer oder zu zweit.</span></div></a>
+    <a class="game" href="Backgammon/"><img src="Backgammon/icon-192.png" alt=""><div><b>Backgammon</b><span>Mit Verdopplungswürfel und Punktestand, gegen den Computer oder zu zweit.</span></div></a>
+    <a class="game" href="Go/"><img src="Go/icon-192.png" alt=""><div><b>Go</b><span>9 × 9, 13 × 13 oder 19 × 19 mit Auszählen der Gebiete.</span></div></a>
+    <a class="game" href="Poker/"><img src="Poker/icon-192.png" alt=""><div><b>Poker</b><span>Texas Hold'em als Turnier gegen 1, 3 oder 5 Computer-Spieler.</span></div></a>
+    <a class="game" href="BlackJack/"><img src="BlackJack/icon-192.png" alt=""><div><b>Black Jack</b><span>Gegen die Bank mit Guthaben, Tipp nach der Grundstrategie und Statistik.</span></div></a>
+  </div>
+  <p class="note">Auf dem Handy ein Spiel öffnen und im Browser-Menü „Zum Startbildschirm hinzufügen“ wählen – dann läuft es wie eine App,
+     auch ohne Internet. Spielstände und Statistik bleiben auf dem jeweiligen Gerät.</p>
+</main>
+</body>
+</html>
