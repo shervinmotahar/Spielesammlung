@@ -1,11 +1,12 @@
-// Backgammon – Offline-Betrieb: App-Dateien werden zwischengespeichert. Bei jedem Start wird im Hintergrund
-// nach neuen Versionen gesucht (beim nächsten Öffnen aktiv). Nach Änderungen VERSION erhöhen.
-const VERSION = 'backgammon-2';
+// Backgammon – Offline-Betrieb. Mit Netz werden die Dateien immer frisch geholt (neue Versionen sind sofort da),
+// ohne Netz (oder nach 3 s ohne Antwort) kommen sie aus dem Zwischenspeicher. Nach Änderungen VERSION erhöhen.
+const VERSION = 'backgammon-3';
 const FILES = ['./', 'index.html', 'app.js', 'backgammon.js', 'manifest.webmanifest',
                'icon-192.png', 'icon-512.png', 'icon-maskable.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: 'reload' – am Browser-Zwischenspeicher vorbei, sonst landet nach einem Update evtl. noch die alte Datei hier
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -17,14 +18,18 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  e.respondWith(caches.open(VERSION).then(async cache => {
-    const cached = await cache.match(req, { ignoreSearch: true });
-    const fresh = fetch(req).then(res => {
+  e.respondWith((async () => {
+    const cache = await caches.open(VERSION);
+    try {
+      // 'no-cache': beim Server nachfragen (GitHub Pages hält Dateien sonst 10 Minuten im Browser-Speicher)
+      const res = await Promise.race([
+        fetch(req, { cache: 'no-cache' }),
+        new Promise((_, fail) => setTimeout(() => fail(new Error('Zeitüberschreitung')), 3000))]);
       if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
       return res;
-    }).catch(() => null);
-    if (cached) return cached;          // sofort aus dem Speicher, Aktualisierung läuft nebenher
-    const res = await fresh;
-    return res || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-  }));
+    } catch (err) {
+      const cached = await cache.match(req, { ignoreSearch: true });
+      return cached || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    }
+  })());
 });

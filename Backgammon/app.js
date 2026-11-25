@@ -664,3 +664,33 @@
     main: mainAction, allowed: () => allowedNow().map(s => [spotOf(turn, s.from), s]), click: onSpot, targets: () => [...targets.keys()].map(k => spotOf(turn, k))
   };
 })();
+
+// ---------------------------------------------------------------- Menü oben rechts (Handy hochkant)
+// Die Einträge werden aus den vorhandenen Knöpfen gebaut (gleiches Symbol, gleicher Text, gleiche Aktion);
+// beim Öffnen wird übernommen, ob ein Knopf gerade gesperrt ist. Reihenfolge und Auswahl: data-items im Kopf.
+(() => {
+  const menu = document.getElementById('menu'), btn = document.getElementById('menuBtn');
+  if (!menu || !btn) return;
+  const RULES_ICON = '<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 8h6M9 12h6"/></svg>';
+  const items = [];
+  const show = on => {
+    if (on) items.forEach(([b, src]) => { b.disabled = src.disabled; });
+    menu.hidden = !on; btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  };
+  menu.dataset.items.split(',').forEach(id => {
+    if (id === '|') { const s = document.createElement('div'); s.className = 'sep'; menu.appendChild(s); return; }
+    const src = document.getElementById(id);
+    if (!src) return;
+    const b = document.createElement('button');
+    b.type = 'button'; b.setAttribute('role', 'menuitem');
+    const svg = src.querySelector('svg');
+    b.innerHTML = svg ? svg.outerHTML : RULES_ICON;
+    b.appendChild(document.createTextNode(src.textContent.trim()));
+    b.addEventListener('click', () => { show(false); src.click(); });
+    menu.appendChild(b); items.push([b, src]);
+  });
+  btn.addEventListener('click', e => { e.stopPropagation(); show(menu.hidden); });
+  document.addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target)) show(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) show(false); });
+  window.addEventListener('resize', () => show(false));
+})();
