@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spielesammlung</title>
+<script>
+  // GitHub Pages unterscheidet Groß-/Kleinschreibung: falsch geschriebene Adressen auf die richtige umleiten
+  (function () {
+    var names = ['Schach', 'BlackJack', 'Dame', 'Go', 'Poker', 'Backgammon'];
+    var parts = location.pathname.split('/');            // ['', 'Spielesammlung', 'spiel', ...]
+    var changed = false;
+    if (parts[1] && parts[1].toLowerCase() === 'spielesammlung' && parts[1] !== 'Spielesammlung') { parts[1] = 'Spielesammlung'; changed = true; }
+    if (parts[2]) {
+      var lower = parts[2].toLowerCase().replace(/[^a-z]/g, '');
+      for (var i = 0; i < names.length; i++)
+        if (names[i].toLowerCase() === lower && parts[2] !== names[i]) { parts[2] = names[i]; changed = true; }
+    }
+    if (changed) location.replace(parts.join('/') + location.search + location.hash);
+  })();
+</script>
+<style>
+  html, body { margin: 0; background: #161616; color: #EDEDED; font-family: "Segoe UI", system-ui, Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 48px 20px; }
+  h1 { font-weight: 300; font-size: 26px; margin: 0 0 12px; }
+  p { color: #9E9E9E; line-height: 1.5; }
+  a { color: #EDEDED; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Seite nicht gefunden</h1>
+  <p>Diese Adresse gibt es nicht. Zur Startseite mit allen Spielen:
+     <a href="/Spielesammlung/">shervinmotahar.github.io/Spielesammlung/</a></p>
+</main>
+</body>
+</html>
