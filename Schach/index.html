@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E0E">
+<meta name="description" content="Schach gegen den Computer oder zu zweit">
+<title>Schach</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&text=%E2%99%94%E2%99%95%E2%99%96%E2%99%97%E2%99%98%E2%99%99%E2%99%9A%E2%99%9B%E2%99%9C%E2%99%9D%E2%99%9E%E2%99%9F&display=block">
+<style>
+  /* Design wie die Windows-Apps (DesktopSymbole, FotoFarbsuche, Schach): dunkel, nur Grautöne */
+  :root {
+    --bg: #161616; --header: #0E0E0E; --card: #1F1F1F; --card-alt: #232323; --border: #333333; --line: #2A2A2A;
+    --hover: #292929; --pressed: #333333; --sel: #2C2C2C;
+    --text: #EDEDED; --muted: #9E9E9E; --faint: #6B6B6B;
+    --primary: #3D3D3D; --primary-hover: #4B4B4B; --primary-pressed: #313131; --primary-disabled: #262626;
+    --marker: #E6E6E6; --focus: #8A8A8A;
+    --font: "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
+  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; }
+
+  /* Kopf */
+  header { flex: none; display: flex; align-items: center; gap: 14px; background: var(--header); border-bottom: 1px solid var(--line);
+           padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top)); }
+  header img { width: 36px; height: 36px; }
+  header h1 { margin: 0; font-weight: 300; font-size: 24px; line-height: 1.1; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+  /* Spielbereich: Handy hochkant untereinander */
+  main { flex: 1; min-height: 0; display: grid; gap: 10px; padding: 12px 12px 10px;
+         grid-template-columns: minmax(0, 1fr);
+         grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+         grid-template-areas: "top" "board" "bottom" "moves" "buttons"; }
+  #pTop { grid-area: top; } #pBottom { grid-area: bottom; }
+  #boardWrap { grid-area: board; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #movesCard { grid-area: moves; } #buttons { grid-area: buttons; }
+  #board { display: block; touch-action: none; }
+
+  /* Spielerkarte */
+  .player { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px 6px 14px; background: var(--card);
+            border: 1px solid var(--border); position: relative; }
+  .player.active { background: var(--sel); border-color: var(--focus); }
+  .player.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--marker); }
+  .player .dot { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--focus); }
+  .player .names { flex: 1; min-width: 0; }
+  .player .title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .player .sub { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .player.active .sub { color: var(--text); }
+  .player canvas { flex: none; height: 22px; }
+  .player .adv { flex: none; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+
+  /* Zugliste: Handy = waagrechter Streifen */
+  .card { background: var(--card); border: 1px solid var(--border); }
+  #movesCard { display: flex; align-items: center; min-height: 40px; }
+  #movesCard .head { display: none; }
+  #moveList { flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding: 0 6px; }
+  #moveList::-webkit-scrollbar { display: none; }
+  .mrow { display: flex; align-items: center; flex: none; }
+  .mrow .no { color: var(--faint); font-size: 13px; padding: 0 3px 0 8px; }
+  .ply { font-size: 14.5px; padding: 4px 7px; border-radius: 3px; white-space: nowrap; }
+  .ply.cur { background: var(--primary); font-weight: 600; }
+  .ply.redo { color: var(--faint); }
+  .empty { color: var(--faint); font-size: 13px; padding: 0 12px; }
+
+  /* Knöpfe: Handy = 4 × 2 mit Symbol über der Schrift */
+  #buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 54px; padding: 4px;
+         background: var(--card); border: 1px solid var(--border); cursor: pointer; font-size: 12px; color: var(--text); }
+  .btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .btn:hover { background: var(--hover); } .btn:active { background: var(--pressed); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); font-weight: 600; }
+  .btn.primary:hover { background: var(--primary-hover); } .btn.primary:active { background: var(--primary-pressed); }
+  .btn:disabled { color: var(--faint); border-color: var(--line); background: var(--card); cursor: default; }
+  .btn.primary:disabled { background: var(--primary-disabled); border-color: var(--primary-disabled); }
+
+  footer { flex: none; display: flex; align-items: center; gap: 12px; min-height: 36px; padding: 6px 16px;
+           padding-bottom: calc(6px + env(safe-area-inset-bottom)); background: var(--header); border-top: 1px solid var(--line); font-size: 13px; }
+  #status { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #info { color: var(--faint); white-space: nowrap; display: none; }
+
+  /* Großer Bildschirm (Tablet quer, PC): Brett links, Spalte rechts – wie die Windows-App */
+  @media (min-width: 860px) and (min-aspect-ratio: 1/1) {
+    header { padding: 14px 24px; } header img { width: 44px; height: 44px; } header h1 { font-size: 28px; }
+    main { padding: 24px; gap: 10px 24px; grid-template-columns: minmax(0, 1fr) 300px;
+           grid-template-rows: auto minmax(0, 1fr) auto auto;
+           grid-template-areas: "board top" "board moves" "board bottom" "board buttons"; }
+    #boardWrap { justify-content: flex-end; }
+    .player { min-height: 64px; }
+    #movesCard { flex-direction: column; align-items: stretch; min-height: 0; }
+    #movesCard .head { display: block; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .3px; padding: 12px 14px 8px; }
+    #moveList { flex-direction: column; overflow-x: hidden; overflow-y: auto; padding: 0; scrollbar-width: thin; }
+    .mrow { padding: 2px 0; } .mrow:nth-child(even) { background: var(--card-alt); }
+    .mrow .no { width: 48px; padding-left: 14px; }
+    .ply { width: 100px; margin-right: 6px; }
+    .empty { padding: 30px 16px; text-align: center; line-height: 1.6; }
+    #buttons { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .btn { flex-direction: row; gap: 8px; min-height: 38px; font-size: 14px; }
+    .btn svg { width: 18px; height: 18px; }
+    footer { padding: 8px 24px; } #info { display: block; }
+  }
+
+  /* Dialoge */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.62); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .sheet { background: var(--card); border: 1px solid var(--border); width: min(560px, calc(100% - 24px)); max-height: calc(100dvh - 24px);
+           display: flex; flex-direction: column; }
+  .sheet.wide { width: min(760px, calc(100% - 24px)); }
+  .sheet .bar { display: flex; align-items: center; padding: 14px 10px 10px 22px; border-bottom: 1px solid var(--line); }
+  .sheet .bar h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
+  .sheet .x { background: none; border: 0; color: var(--muted); font-size: 22px; width: 40px; height: 36px; cursor: pointer; }
+  .sheet .body { overflow-y: auto; padding: 4px 22px 18px; }
+  .sheet .foot { display: flex; gap: 10px; align-items: center; padding: 14px 22px; border-top: 1px solid var(--line);
+                 padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .sheet .foot .grow { flex: 1; }
+  .msg { font-size: 15.5px; line-height: 1.45; padding: 16px 0 6px; }
+  @media (max-width: 600px) {
+    .overlay { align-items: flex-end; }
+    .sheet, .sheet.wide { width: 100%; max-height: 92dvh; border-width: 1px 0 0; }
+  }
+  h3 { font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: .3px; margin: 20px 0 9px; text-transform: uppercase; }
+  .fbtn { min-height: 40px; padding: 0 18px; background: var(--card); border: 1px solid var(--border); cursor: pointer; font-size: 14.5px; white-space: nowrap; }
+  @media (max-width: 420px) { .fbtn { padding: 0 11px; } .sheet .foot { gap: 6px; padding-left: 14px; padding-right: 14px; } }
+  .fbtn:hover { background: var(--hover); } .fbtn:active { background: var(--pressed); }
+  .fbtn.primary { background: var(--primary); border-color: var(--primary); font-weight: 600; color: #fff; }
+  .fbtn.primary:hover { background: var(--primary-hover); }
+  .fbtn.link { background: none; border-color: transparent; color: var(--muted); padding: 0 6px; }
+  .fbtn.link:hover { color: var(--text); text-decoration: underline; }
+  .fbtn:disabled { color: var(--faint); border-color: var(--line); background: var(--card); cursor: default; }
+  .fbtn.primary:disabled { background: var(--primary-disabled); border-color: var(--primary-disabled); }
+  .choices { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+  .choices .fbtn.on { background: var(--primary); border-color: var(--primary); font-weight: 600; color: #fff; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 10px; }
+  .tile { width: 76px; background: none; border: 0; padding: 0; cursor: pointer; color: var(--muted); font-size: 12.5px; text-align: center; }
+  .tile canvas { display: block; width: 72px; height: 72px; margin: 0 auto 5px; outline: 1px solid transparent; outline-offset: 2px; }
+  .tile:hover canvas { outline-color: var(--focus); }
+  .tile.on { color: var(--text); } .tile.on canvas { outline: 2px solid var(--marker); }
+  @media (max-width: 420px) { .tiles { gap: 8px; } .tile { width: 58px; } .tile canvas { width: 54px; height: 54px; } }
+  .colors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .colors label { display: block; font-size: 14px; margin-bottom: 6px; }
+  .cbtn { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px 0 8px; background: var(--bg);
+          border: 1px solid var(--border); cursor: pointer; font-size: 14.5px; }
+  .cbtn:hover { background: var(--hover); }
+  .cbtn .sw { width: 24px; height: 24px; border: 1px solid var(--focus); }
+  .cbtn .hint { margin-left: auto; color: var(--muted); font-size: 12.5px; }
+  .toggle-row { display: flex; align-items: center; gap: 14px; padding: 6px 0; cursor: pointer; font-size: 14.5px; }
+  .toggle { flex: none; width: 46px; height: 26px; border-radius: 13px; background: #3D3D3D; border: 0; position: relative; cursor: pointer; padding: 0; }
+  .toggle::after { content: ""; position: absolute; left: 5px; top: 5px; width: 16px; height: 16px; border-radius: 50%; background: #8E8E8E; transition: left .12s; }
+  .toggle.on { background: #E6E6E6; } .toggle.on::after { left: 25px; background: #161616; }
+  .palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
+  .palette button { aspect-ratio: 1; border: 1px solid var(--border); padding: 0; cursor: pointer; outline: 1px solid transparent; outline-offset: 2px; }
+  .palette button:hover { outline-color: var(--focus); } .palette button.on { outline: 2px solid var(--marker); }
+  .hexrow { display: flex; gap: 10px; align-items: center; }
+  .hexrow input[type=text] { width: 140px; min-height: 40px; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 0 12px; font: inherit; font-size: 14.5px; }
+  .hexrow input[type=text]:focus { outline: none; border-color: var(--focus); }
+  .hexrow .cur { width: 40px; height: 40px; border: 1px solid var(--focus); }
+  .hexrow input[type=color] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+  .settings-grid { display: grid; grid-template-columns: 1fr; gap: 0 28px; }
+  .settings-grid canvas.preview { width: 100%; max-width: 320px; aspect-ratio: 1; display: block; }
+  @media (min-width: 720px) { .settings-grid { grid-template-columns: 1fr 300px; } }
+  .promo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding-top: 14px; }
+  .promo button { background: var(--bg); border: 1px solid var(--border); padding: 8px 8px 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
+  .promo button:hover { background: var(--hover); color: var(--text); border-color: var(--focus); }
+  .promo canvas { width: 100%; aspect-ratio: 1; display: block; margin-bottom: 6px; }
+  /* Statistik */
+  .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+  .stat-tile { background: var(--bg); border: 1px solid var(--border); padding: 12px 14px; }
+  .stat-tile b { display: block; font-weight: 300; font-size: 28px; line-height: 1.15; }
+  .stat-tile span { color: var(--muted); font-size: 12.5px; }
+  .legend { display: flex; gap: 16px; justify-content: flex-end; font-size: 12px; color: var(--muted); margin: -26px 0 10px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; }
+  @media (max-width: 600px) { .legend { margin: 0 0 8px; justify-content: flex-start; } }
+  .barrow { display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: center; min-height: 32px; font-size: 14px; }
+  .barrow.gap { margin-top: 10px; }
+  .bar { height: 12px; background: var(--line); display: flex; }
+  .bar i { display: block; height: 100%; }
+  .barrow small { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+  .line-text { font-size: 14.5px; margin: 14px 0 0; }
+  .games { border: 1px solid var(--border); max-height: 260px; overflow-y: auto; }
+  .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 9px 14px; align-items: center; }
+  .game:nth-child(even) { background: var(--card-alt); }
+  .game .who { font-weight: 600; font-size: 14px; }
+  .game .meta { color: var(--muted); font-size: 12.5px; grid-column: 1; }
+  .pill { grid-row: 1 / span 2; grid-column: 2; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 3px; }
+  .pill.win { background: var(--marker); color: var(--bg); } .pill.draw { background: var(--primary); }
+  .pill.loss { background: #2C2C2C; color: var(--muted); }
+  .games .empty { padding: 24px 16px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+<header>
+  <img src="icon-192.png" alt="">
+  <div>
+    <h1>Schach</h1>
+    <p>Gegen den Computer oder zu zweit</p>
+  </div>
+</header>
+
+<main>
+  <div class="player" id="pTop"></div>
+  <div id="boardWrap"><canvas id="board"></canvas></div>
+  <div class="player" id="pBottom"></div>
+  <div class="card" id="movesCard"><div class="head">ZÜGE</div><div id="moveList"></div></div>
+  <div id="buttons">
+    <button class="btn" id="bUndo" title="Zug zurück (Strg+Z, Pfeil links)"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>Zurück</button>
+    <button class="btn" id="bRedo" title="Zug vor (Strg+Y, Pfeil rechts)"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>Vor</button>
+    <button class="btn" id="bHint" title="Der Computer zeigt einen guten Zug (Strg+H)"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Tipp</button>
+    <button class="btn" id="bFlip" title="Brett drehen (Strg+D)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12A9 9 0 0 1 18.5 5.8"/><path d="M19 2v4h-4M5 22v-4h4"/></svg>Drehen</button>
+    <button class="btn" id="bResign" title="Die Partie als verloren werten"><svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>Aufgeben</button>
+    <button class="btn" id="bStats" title="Statistik"><svg viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg>Statistik</button>
+    <button class="btn primary" id="bNew" title="Neues Spiel (Strg+N)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Neues Spiel</button>
+    <button class="btn" id="bSettings" title="Einstellungen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Einstellungen</button>
+  </div>
+</main>
+
+<footer><div id="status"></div><div id="info"></div></footer>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
