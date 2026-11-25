@@ -104,7 +104,8 @@
   function paintTable(ctx, W, H, g, look, reveal) {
     ctx.clearRect(0, 0, W, H);
     const felt = FELTS[look.felt][1], back = BACKS[look.back][1];
-    const portrait = H > W * 1.1;
+    // Reihen-Anordnung (Hochformat) auf allen schmalen Tischen – das Oval braucht Breite (sonst überlappen die Schilder)
+    const portrait = H > W * 1.1 || (W < 620 && W < H * 1.4);
     // Hochformat: abgerundetes Rechteck (Platz in den Ecken für die Schilder), quer: ovaler Tisch
     const ox = W * (portrait ? 0.015 : 0.04), oy = H * (portrait ? 0.015 : 0.07), ow = W - 2 * ox, oh = H - 2 * oy;
     const rad = portrait ? Math.min(ow, oh) * 0.16 : Math.min(ow, oh) / 2;
@@ -118,20 +119,23 @@
 
     // Maße: Schild (Name, Chips, Aktion, kleine verdeckte Karten), Kartengröße
     const n = g.players.length, gap = 6;
-    const podW = portrait ? Math.min(122, (iw - 4 * gap) / 3) : Math.min(150, Math.max(104, W * 0.17)), podH = portrait ? 54 : 60;
-    const ch = portrait ? Math.min(H * 0.12, W * 0.16) : Math.min(H * 0.16, W * 0.09), cw = ch * 0.7;
+    const podW = portrait ? Math.min(122, (iw - 4 * gap) / 3) : Math.min(150, Math.max(104, W * 0.17));
+    const podH = portrait ? (ih < 340 ? 48 : 54) : 60;
+    // Hochformat: Kartengröße aus der Höhe zwischen den Schild-Reihen. Von oben nach unten liegen dort:
+    // Einsätze/aufgedeckte Karten der oberen Reihe (0,8·ch), Pot (20), Tischkarten (ch), dein Einsatz (0,3·ch), deine Karten (1,1·ch)
+    const T = iy + 6 + podH / 2, B = iy + ih - 6 - podH / 2, mid = B - T - podH;
+    const ch = portrait ? Math.max(26, Math.min(H * 0.13, W * 0.16, (mid - 44) / 3.2)) : Math.min(H * 0.16, W * 0.09), cw = ch * 0.7;
     const hkh = ch * 1.1, hkw = cw * 1.1;                                    // deine Karten
     const cx = W / 2;
     // Sitzplätze (Mittelpunkt des Schilds); Platz 0 = du unten in der Mitte, dann im Uhrzeigersinn
     let seats, boardY;
     if (portrait) {
       const L = ix + gap + podW / 2, R = ix + iw - gap - podW / 2, C = cx;
-      const T = iy + 8 + podH / 2, B = iy + ih - 8 - podH / 2;
       seats = n === 2 ? [[C, B], [C, T]] : n === 4 ? [[C, B], [L, T], [C, T], [R, T]]
                                        : [[C, B], [L, B], [L, T], [C, T], [R, T], [R, B]];
-      const topZone = T + podH / 2 + 4 + ch * 0.8;                        // unter den oberen Schildern: Einsätze bzw. aufgedeckte Karten
-      const bottomZone = B - podH / 2 - 8 - hkh;                          // über deinem Schild: deine Karten
-      boardY = (topZone + bottomZone) / 2 + 8;
+      const d = Math.max(16, ch * 0.3), zt = Math.max(d + 8, ch * 0.8 + 8);
+      const need = zt + 20 + ch + d + 10 + hkh + 6, extra = Math.max(0, mid - need);
+      boardY = T + podH / 2 + zt + 20 + extra / 2 + ch / 2;
     } else {
       const rx = iw / 2 - podW / 2 - gap, ry = ih / 2 - podH / 2 - gap;
       seats = g.players.map((p, i) => { const a = Math.PI / 2 + 2 * Math.PI * i / n; return [cx + Math.cos(a) * rx, H / 2 + Math.sin(a) * ry]; });
@@ -299,6 +303,7 @@
     $('aHint').disabled = !my;
     if (my && hintAct) ({ fold, call, raise, allin: $('aAllIn') })[hintAct].classList.add('marked');
     $('bNew').classList.toggle('primary', game.tournamentOver());
+    $('mNew').classList.toggle('primary', game.tournamentOver()); $('menuBtn').classList.toggle('marked', game.tournamentOver());
     // Status
     let s;
     if (game.tournamentOver() && over) s = h.out ? 'Du bist ausgeschieden (Platz ' + h.place + ' von ' + game.players.length + '). Starte ein neues Turnier.' : 'Du hast das Turnier gewonnen!  Glückwunsch!';
@@ -614,6 +619,14 @@
   $('bRules').addEventListener('click', openRules);
   $('bNew').addEventListener('click', askNewGame);
   $('bSettings').addEventListener('click', openSettings);
+  // Menü oben rechts (Handy hochkant): Einträge lösen die Knöpfe der unteren Reihe aus
+  const menu = $('menu'), menuBtn = $('menuBtn');
+  const showMenu = on => { menu.hidden = !on; menuBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+  menuBtn.addEventListener('click', e => { e.stopPropagation(); showMenu(menu.hidden); });
+  menu.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { showMenu(false); $(b.dataset.for).click(); }));
+  document.addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target)) showMenu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) showMenu(false); });
+  window.addEventListener('resize', () => showMenu(false));
   document.addEventListener('keydown', e => {
     if (sheets.length) { if (e.key === 'Escape') closeSheet(sheets[sheets.length - 1]); return; }
     const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
@@ -628,7 +641,13 @@
   // ---------------------------------------------------------------- Start
   if (loadGame()) { render(); nextHand(); } else newTournament(false);
   new ResizeObserver(draw).observe(wrap);
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    // neue Version sofort zeigen: übernimmt ein neuer Service Worker (Update, nicht Erstinstallation), einmal neu laden –
+    // nur kurz nach dem Start, damit keine laufende Hand verloren geht
+    const hadController = !!navigator.serviceWorker.controller, started = Date.now();
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && Date.now() - started < 15000) location.reload(); });
+    navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+  }
 
   window.poker = { state: () => ({ street: game.street, hand: game.handNo, toAct: game.toAct, human: game.humanToAct(), chips: game.players.map(p => p.chips),
                                     pot: game.pot(), busy, status: $('status').textContent, stats: stats.haende.length }),

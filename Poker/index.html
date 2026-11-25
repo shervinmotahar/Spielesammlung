@@ -31,6 +31,24 @@
   header img { width: 36px; height: 36px; }
   header h1 { margin: 0; font-weight: 300; font-size: 24px; line-height: 1.1; }
   header p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  header { position: relative; }
+  header > div { min-width: 0; } header p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Menü oben rechts (Handy hochkant: ersetzt die untere Knopfreihe) */
+  #menuBtn { margin-left: auto; flex: none; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;
+             background: none; border: 1px solid transparent; color: var(--text); cursor: pointer; position: relative; }
+  #menuBtn:hover, #menuBtn[aria-expanded="true"] { background: var(--hover); border-color: var(--border); }
+  #menuBtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+  #menuBtn.marked::after { content: ""; position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--marker); }
+  #menu { position: absolute; right: 10px; top: calc(100% - 4px); z-index: 9; min-width: 220px; background: var(--card);
+          border: 1px solid var(--border); box-shadow: 0 10px 28px rgba(0,0,0,.55); padding: 4px 0; }
+  #menu[hidden] { display: none; }
+  #menu button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 48px; padding: 0 18px; background: none; border: 0;
+                 color: var(--text); font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+  #menu button:hover, #menu button:focus-visible { background: var(--hover); outline: none; }
+  #menu button.primary { font-weight: 600; box-shadow: inset 3px 0 0 var(--marker); }
+  #menu svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #buttons { display: none !important; }
 
   /* Spielbereich: Handy hochkant untereinander */
   main { flex: 1; min-height: 0; display: grid; gap: 8px; padding: 10px 10px 8px;
@@ -96,6 +114,7 @@
            grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
            grid-template-areas: "table top" "table rounds" "table bottom" "table actions" "table amount" "table buttons"; }
     #pTable { display: flex !important; } #roundsCard { display: flex !important; } #amount { grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    #buttons { display: grid !important; } #menuBtn, #menu { display: none !important; }
     #actions { grid-template-columns: 1fr 1fr 1fr; }
     .player { min-height: 64px; }
     #roundsCard { flex-direction: column; align-items: stretch; min-height: 0; }
@@ -111,6 +130,13 @@
     footer { padding: 8px 24px; } #info { display: block; }
   }
 
+  /* Handy hochkant mit wenig Höhe (Browser mit Adressleiste): mehr Platz für den Tisch.
+     Die „Du“-Karte fällt weg (Name, Chips und Aktion stehen im Schild auf dem Tisch, der Status unten). */
+  @media (max-width: 859px) and (orientation: portrait) and (max-height: 760px) {
+    #pYou { display: none; }
+    main { grid-template-areas: "top" "table" "rounds" "actions" "amount" "buttons"; grid-template-rows: auto minmax(0, 1fr) auto auto auto auto; }
+  }
+
   /* Handy quer (niedrig): Tisch links, kompakte Spalte rechts, ohne Kopf – sonst bleibt für den Tisch keine Höhe */
   @media (orientation: landscape) and (max-height: 560px) {
     header { display: none; }
@@ -119,6 +145,7 @@
            grid-template-rows: minmax(0, 1fr) auto auto auto auto;
            grid-template-areas: "table ." "table bottom" "table actions" "table amount" "table buttons"; }
     #pTable { display: none !important; } #roundsCard { display: none !important; }
+    #buttons { display: grid !important; } #menuBtn, #menu { display: none !important; }
     .player { min-height: 44px; }
     #actions { grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 0; }
     #amount { grid-template-columns: 1fr 1fr 1.4fr 1.4fr; gap: 6px; }
@@ -206,6 +233,13 @@
   <div>
     <h1>Poker</h1>
     <p>Texas Hold'em gegen Computer-Spieler</p>
+  </div>
+  <button id="menuBtn" title="Menü" aria-label="Menü" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <div id="menu" role="menu" hidden>
+    <button role="menuitem" data-for="bStats"><svg viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg>Statistik</button>
+    <button role="menuitem" data-for="bRules"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 8h6M9 12h6"/></svg>Regeln</button>
+    <button role="menuitem" data-for="bNew" id="mNew"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Neues Turnier</button>
+    <button role="menuitem" data-for="bSettings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Einstellungen</button>
   </div>
 </header>
 
